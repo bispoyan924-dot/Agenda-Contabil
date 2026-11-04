@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agenda de Obrigações</title>
+<meta name="description" content="Controle das obrigações fiscais mensais: Simples Nacional, DAR ICMS, PIS/COFINS, Reinf, MIT, EFD Fiscal e EFD Contribuições.">
+<meta name="theme-color" content="#2747A0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<!-- Tela de login -->
+<div class="wrap" id="loginView" hidden>
+  <form class="login" id="loginForm">
+    <div>
+      <div class="eyebrow">Departamento fiscal</div>
+      <h1>Agenda de Obrigações</h1>
+    </div>
+    <label class="field"><span>E-mail</span><input type="email" id="lEmail" autocomplete="username" required></label>
+    <label class="field"><span>Senha</span><input type="password" id="lPass" autocomplete="current-password" minlength="6" required></label>
+    <p class="err" id="lErr" hidden></p>
+    <p class="ok" id="lOk" hidden></p>
+    <div class="actions">
+      <button class="btn primary" type="submit">Entrar</button>
+      <button class="btn" type="button" id="lCriar">Criar conta</button>
+      <button class="linkbtn" type="button" id="lReset">Esqueci a senha</button>
+    </div>
+  </form>
+</div>
+
+<!-- App -->
+<div class="wrap" id="appView" hidden>
+  <header class="top">
+    <div>
+      <div class="eyebrow">Departamento fiscal</div>
+      <h1>Agenda de Obrigações</h1>
+    </div>
+    <div class="who">
+      <div class="sync" id="sync" data-s="wait">Carregando…</div>
+      <span class="small muted" id="whoEmail"></span>
+      <button class="btn sm" id="logout">Sair</button>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Seções">
+    <a href="#agenda" data-tab="agenda">Agenda</a>
+    <a href="#empresas" data-tab="empresas">Empresas</a>
+    <a href="#avisos" data-tab="avisos">Avisos Telegram / e-mail</a>
+    <a href="#prazos" data-tab="prazos">Regras de prazo</a>
+  </nav>
+
+  <section id="v-agenda" class="view">
+    <div id="banner"></div>
+    <div class="summary" id="summary"></div>
+    <div class="board">
+      <div class="sheet">
+        <div class="sheet-bar">
+          <div class="monthnav">
+            <button class="iconbtn" id="prev" aria-label="Mês anterior">‹</button>
+            <div><h2 id="mtitle"></h2><div class="small muted">mês de entrega</div></div>
+            <button class="iconbtn" id="next" aria-label="Próximo mês">›</button>
+          </div>
+          <input type="search" id="busca" placeholder="Buscar empresa ou CNPJ" aria-label="Buscar empresa">
+          <div class="seg" role="group" aria-label="Filtro de situação">
+            <button data-f="todas">Todas</button>
+            <button data-f="pendentes">Com pendência</button>
+            <button data-f="entregues">Tudo entregue</button>
+          </div>
+          <label class="dispensa"><input type="checkbox" id="modoDisp"> Marcar ⊘ não se aplica</label>
+        </div>
+        <p class="note small" id="dica"></p>
+        <div class="tablewrap sheetwrap"><table class="grade" id="grade"></table></div>
+      </div>
+      <aside class="cal">
+        <div class="grid7" id="cal"></div>
+        <div class="legend">
+          <span><i class="st-late"></i>Atrasada</span>
+          <span><i class="st-warn"></i>Pendente</span>
+          <span><i class="st-ok"></i>Tudo entregue</span>
+          <span><i style="background:var(--holiday)"></i>Feriado</span>
+        </div>
+        <div id="daySel" class="small"></div>
+        <h3>Prazos do mês</h3>
+        <ul class="prazos" id="prazosMes"></ul>
+        <button class="btn sm" id="hoje" style="justify-self:start">Voltar para o mês atual</button>
+      </aside>
+    </div>
+  </section>
+
+  <section id="v-empresas" class="view" hidden>
+    <div class="two">
+      <div style="display:grid;gap:18px;min-width:0">
+      <form class="panel" id="empForm">
+        <h2 id="empFormTitle">Nova empresa</h2>
+        <div class="form">
+          <label class="field"><span>Razão social / nome</span><input type="text" id="eNome" required></label>
+          <label class="field"><span>CNPJ</span><input type="text" id="eCnpj" class="mono" placeholder="00.000.000/0000-00"></label>
+          <label class="field"><span>Tributação</span>
+            <select id="eReg"><option value="simples">Simples Nacional</option><option value="presumido">Lucro Presumido</option><option value="real">Lucro Real</option></select>
+          </label>
+          <label class="field"><span>Segmento</span>
+            <select id="eSeg"><option value="">—</option><option value="servico">Serviço</option><option value="comercio">Comércio</option><option value="industria">Indústria</option><option value="ambos">Ambos</option></select>
+          </label>
+          <label class="field"><span>Inscrição estadual</span><input type="text" id="eIe" class="mono" placeholder="número ou BAIXADA"></label>
+        </div>
+        <div class="field"><span>Obrigações desta empresa</span><div class="checks" id="eObs"></div></div>
+        <div class="actions">
+          <button class="btn primary" type="submit" id="eSave">Adicionar empresa</button>
+          <button class="btn" type="button" id="eCancel" hidden>Cancelar edição</button>
+        </div>
+      </form>
+      <form class="panel" id="impForm">
+        <h2>Importar várias empresas</h2>
+        <p class="note small" style="margin:0">Copie as linhas da sua planilha (Empresa, CNPJ/CPF, Tributação, Segmento, IE) e cole aqui, uma empresa por linha. As obrigações entram conforme o regime e podem ser ajustadas depois em Editar. CNPJ já cadastrado é ignorado.</p>
+        <textarea id="impTxt" rows="7" class="mono" style="width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:.8rem;resize:vertical" placeholder="EMPRESA EXEMPLO LTDA&#9;00.000.000/0001-00&#9;SIMPLES NACIONAL&#9;SERVIÇO&#9;135642515"></textarea>
+        <p class="note small" id="impPrev" style="margin:0"></p>
+        <div class="actions"><button class="btn primary" type="submit">Importar empresas</button></div>
+      </form>
+      </div>
+      <div class="panel">
+        <h2>Empresas cadastradas <span class="muted small" id="empCount"></span></h2>
+        <div class="tablewrap"><table><thead><tr><th>Empresa</th><th>Tributação</th><th>Obrigações</th><th></th></tr></thead><tbody id="empRows"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="v-avisos" class="view" hidden>
+    <div class="two">
+      <div style="display:grid;gap:18px;min-width:0">
+      <form class="panel" id="cfgForm">
+        <h2>Para onde enviar</h2>
+        <div class="form">
+          <label class="field"><span>WhatsApp (com DDD)</span><input type="tel" id="cWpp" class="mono" placeholder="65 99999-9999"></label>
+          <label class="field"><span>E-mail</span><input type="email" id="cMail" placeholder="voce@exemplo.com"></label>
+          <label class="field"><span>Avisar com quantos dias de antecedência</span><input type="number" id="cDias" min="0" max="30"></label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" type="submit">Salvar contatos</button>
+          <button class="btn" type="button" id="testSend">Enviar teste agora</button>
+        </div>
+        <p class="note small" id="testResult"></p>
+        <p class="note">Todo dia útil, entre 8h e 9h (horário de Cuiabá), a agenda confere o que falta entregar, mesmo com o computador desligado. Se houver obrigação atrasada ou vencendo dentro do prazo de aviso, manda esta mensagem para o Telegram e o e-mail cadastrados, uma vez por dia.</p>
+      </form>
+      <form class="panel" id="tgForm">
+        <h2>Aviso no celular pelo Telegram</h2>
+        <div id="tgOff" class="field" style="gap:10px">
+          <ol class="note" style="margin:0;padding-left:20px;display:grid;gap:4px">
+            <li>No Telegram, abra a conversa com <b>@BotFather</b> e mande <span class="mono">/newbot</span>.</li>
+            <li>Escolha um nome (ex.: Agenda Contábil) e um usuário terminado em <span class="mono">bot</span> (ex.: agenda_contabil_bot).</li>
+            <li>O BotFather responde com um código parecido com <span class="mono">123456789:AAH…</span>. Cole abaixo.</li>
+            <li>Toque no link do seu robô que ele mandou, aperte <b>Começar</b> e volte aqui.</li>
+          </ol>
+          <label class="field"><span>Código do robô (token)</span><input type="text" id="tgToken" class="mono" placeholder="123456789:AAH..." autocomplete="off"></label>
+          <div class="actions"><button class="btn primary" type="submit">Conectar Telegram</button></div>
+        </div>
+        <div id="tgOn" hidden>
+          <p style="margin:0"><span class="stamp" style="display:inline-block">Conectado</span> <span id="tgInfo"></span></p>
+          <div class="actions" style="margin-top:10px"><button class="btn sm danger" type="button" id="tgOffBtn">Desconectar</button></div>
+        </div>
+        <p class="note small" id="tgMsg"></p>
+      </form>
+      <form class="panel" id="envForm">
+        <h2>Envio por e-mail</h2>
+        <div class="form">
+          <label class="field"><span>Gmail que vai enviar</span><input type="email" id="sGmail" placeholder="seuemail@gmail.com" autocomplete="off"></label>
+          <label class="field"><span>Senha de app do Gmail</span><input type="password" id="sSenha" placeholder="16 letras" autocomplete="new-password"></label>
+        </div>
+        <div class="actions"><button class="btn primary" type="submit">Salvar conta de e-mail</button><span class="small muted" id="sStatus"></span></div>
+        <p class="note small">A senha de app não é a senha normal do Gmail: gere em myaccount.google.com/apppasswords (precisa da verificação em duas etapas ligada). A senha fica guardada na sua conta, protegida pelo seu login.</p>
+      </form>
+      </div>
+      <div class="panel">
+        <h2>Mensagem de lembrete</h2>
+        <pre class="msg" id="msg"></pre>
+        <div class="actions">
+          <a class="btn primary" id="aWpp" target="_blank" rel="noopener">Abrir no WhatsApp</a>
+          <a class="btn" id="aMail" target="_blank" rel="noopener">Abrir no Gmail</a>
+          <button class="btn" type="button" id="copy">Copiar mensagem</button>
+        </div>
+        <p class="note small" id="destNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="v-prazos" class="view" hidden>
+    <div class="two">
+      <div class="panel">
+        <h2>Regras de vencimento</h2>
+        <p class="note">Prazos conforme a legislação em vigor em novembro de 2026. Quando a regra é por dia fixo, você pode ajustar o dia e o que acontece em fim de semana ou feriado.</p>
+        <div class="tablewrap"><table><thead><tr><th>Obrigação</th><th>Competência</th><th>Último dia</th><th>Dia não útil</th></tr></thead><tbody id="ruleRows"></tbody></table></div>
+        <div class="actions"><button class="btn primary" id="saveRules">Salvar regras</button></div>
+      </div>
+      <div class="panel">
+        <h2>Feriados considerados <span class="muted small" id="holYear"></span></h2>
+        <p class="note">Feriados nacionais, Carnaval, Sexta-feira Santa e Corpus Christi são calculados sozinhos. Inclua feriados estaduais ou municipais que afetem algum prazo.</p>
+        <div class="tablewrap"><table><tbody id="holRows"></tbody></table></div>
+        <div class="actions">
+          <input type="date" id="hDate" aria-label="Data do feriado">
+          <input type="text" id="hName" placeholder="Nome do feriado" aria-label="Nome do feriado">
+          <button class="btn" id="hAdd">Adicionar feriado</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="wrap" id="setupView" hidden>
+  <div class="login">
+    <h1>Falta configurar</h1>
+    <p class="muted" style="margin:0" id="setupMsg">As chaves do Supabase ainda não foram cadastradas na Vercel. Siga o passo 3 do README (variáveis SUPABASE_URL e SUPABASE_ANON_KEY) e clique em Redeploy.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
